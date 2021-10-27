@@ -35,7 +35,7 @@
         let text = []
         for (let d of data) {
             let share = Math.round((d.weight / totalWeight) * 100)
-            text.push(`${d.name}:\n            share = ${share}%    weight = ${d.weight}`)
+            text.push(`${share}%        ${d.name}    (weight = ${d.weight})`)
         }
         new Alert("CFS Shares", text.join("\n")).show()
     });
