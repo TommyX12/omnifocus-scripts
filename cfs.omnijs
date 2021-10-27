@@ -34,7 +34,8 @@
         let minRuntime = -1
         for (let t of queuesFolder.projects) {
             let runtime = t.estimatedMinutes || 1
-            if ((t == task || t.nextTask) && (minRuntime === -1 || runtime < minRuntime)) {
+            if ((t == task || (t.nextTask && t.nextTask != t.task))
+                && (minRuntime === -1 || runtime < minRuntime)) {
                 minRuntime = runtime
             }
         }
