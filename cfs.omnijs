@@ -1,0 +1,97 @@
+/*{
+  "type": "action",
+  "targets": ["omnifocus"],
+  "author": "TommyX",
+  "identifier": "com.tommyx.cfs",
+  "version": "1.0",
+  "description": "Completely-Fair Scheduling",
+  "label": "Completely-Fair Scheduling",
+  "paletteLabel": "CFS"
+  }*/
+
+(() => {
+
+    let cfsTagName = "cfs"
+
+    let work = (task, duration) => {
+        let cfsTag = flattenedTags.byName(cfsTagName) || new Tag(cfsTagName)
+        let runtime = task.estimatedMinutes || 1
+        let match = task.note.match(/\bweight: ([.0-9]+)\b/)
+        let weight = (match && match[1]) || 1
+        if (weight <= 0) weight = 1
+        let delta = Math.ceil(duration / weight)
+        task.estimatedMinutes = runtime + delta
+
+        // normalization
+        let minRuntime = -1
+        for (let t of cfsTag.remainingTasks) {
+            let runtime = t.estimatedMinutes || 1
+            if (minRuntime === -1 || runtime < minRuntime) {
+                minRuntime = runtime
+            }
+        }
+        if (minRuntime !== -1) {
+            let delta = minRuntime - 1
+            for (let t of cfsTag.remainingTasks) {
+                let runtime = t.estimatedMinutes || 1
+                t.estimatedMinutes = runtime - delta
+            }
+        }
+    }
+
+    let action = new PlugIn.Action(function(selection, sender) {
+        let inputForm = new Form()
+        let dateFormat = Formatter.Date.Style.Short
+        let dateFormatter = Formatter.Date.withStyle(dateFormat, dateFormat)
+
+        let durationField = new Form.Field.String(
+            "duration",
+            "Duration (hours)",
+            "0.5"
+        )
+
+        inputForm.addField(durationField)
+
+        let formPromise = inputForm.show("Enter duration", "Continue")
+
+        inputForm.validate = function(formObject){
+            let duration = parseFloat(formObject.values["duration"])
+            return !isNaN(duration) && duration > 0
+        }
+
+        formPromise.then(function(formObject){
+            try {
+                let selected = undefined
+                for (let task of selection.projects) {
+                    selected = task
+                }
+                for (let task of selection.tasks) {
+                    selected = task
+                }
+                work(selected, Math.round(parseFloat(formObject.values["duration"]) * 60))
+            }
+            catch(err){
+                console.error(err)
+            }
+        })
+
+        formPromise.catch(function(err){
+            console.log("form cancelled", err.message)
+        })
+    });
+
+    action.validate = function(selection, sender) {
+        let selected = undefined
+        for (let task of selection.projects) {
+            if (selected) return false
+            selected = task
+        }
+        for (let task of selection.tasks) {
+            if (selected) return false
+            selected = task
+        }
+        return selected !== undefined && selected.tags.byName(cfsTagName) !== null
+    };
+
+    return action;
+})();
