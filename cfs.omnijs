@@ -10,11 +10,11 @@
   }*/
 
 (() => {
-
-    let cfsTagName = "cfs"
+    let getQueuesFolder = () => {
+        return folders.byName("Queues")
+    }
 
     let work = (task, duration) => {
-        let cfsTag = flattenedTags.byName(cfsTagName) || new Tag(cfsTagName)
         let runtime = task.estimatedMinutes || 1
         let match = task.note.match(/\bweight: ([.0-9]+)\b/)
         let weight = (match && match[1]) || 1
@@ -23,8 +23,9 @@
         task.estimatedMinutes = runtime + delta
 
         // normalization
+        let queuesFolder = getQueuesFolder()
         let minRuntime = -1
-        for (let t of cfsTag.remainingTasks) {
+        for (let t of queuesFolder.projects) {
             let runtime = t.estimatedMinutes || 1
             if (minRuntime === -1 || runtime < minRuntime) {
                 minRuntime = runtime
@@ -32,7 +33,7 @@
         }
         if (minRuntime !== -1) {
             let delta = minRuntime - 1
-            for (let t of cfsTag.remainingTasks) {
+            for (let t of queuesFolder.projects) {
                 let runtime = t.estimatedMinutes || 1
                 t.estimatedMinutes = runtime - delta
             }
@@ -81,16 +82,13 @@
     });
 
     action.validate = function(selection, sender) {
-        let selected = undefined
-        for (let task of selection.projects) {
-            if (selected) return false
-            selected = task
-        }
-        for (let task of selection.tasks) {
-            if (selected) return false
-            selected = task
-        }
-        return selected !== undefined && selected.tags.byName(cfsTagName) !== null
+        let queuesFolder = getQueuesFolder()
+        if (!queuesFolder) return false;
+
+        if (!selection.projects || selection.projects.length !== 1) return false;
+
+        let selected = selection.projects[0]
+        return selected.parentFolder == queuesFolder
     };
 
     return action;
