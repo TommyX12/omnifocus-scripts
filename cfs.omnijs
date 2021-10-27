@@ -15,6 +15,14 @@
     }
 
     let work = (task, duration) => {
+        let queuesFolder = getQueuesFolder()
+        for (let t of queuesFolder.projects) {
+            if (t.containsSingletonActions) {
+                new Alert("Invalid project", "Project with singleton actions is not supported").show()
+                return
+            }
+        }
+
         let runtime = task.estimatedMinutes || 1
         let match = task.note.match(/\bweight: ([.0-9]+)\b/)
         let weight = (match && parseFloat(match[1])) || 1
@@ -23,11 +31,10 @@
         task.estimatedMinutes = runtime + delta
 
         // normalization
-        let queuesFolder = getQueuesFolder()
         let minRuntime = -1
         for (let t of queuesFolder.projects) {
             let runtime = t.estimatedMinutes || 1
-            if (minRuntime === -1 || runtime < minRuntime) {
+            if ((t == task || t.nextTask) && (minRuntime === -1 || runtime < minRuntime)) {
                 minRuntime = runtime
             }
         }
@@ -35,7 +42,7 @@
             let delta = minRuntime - 1
             for (let t of queuesFolder.projects) {
                 let runtime = t.estimatedMinutes || 1
-                t.estimatedMinutes = runtime - delta
+                t.estimatedMinutes = Math.max(1, runtime - delta)
             }
         }
     }
@@ -57,7 +64,7 @@
 
         inputForm.validate = function(formObject){
             let duration = parseFloat(formObject.values["duration"])
-            return !isNaN(duration) && duration > 0
+            return !isNaN(duration) && duration >= 0
         }
 
         formPromise.then(function(formObject){
