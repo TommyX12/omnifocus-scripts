@@ -1,0 +1,48 @@
+/*{
+  "type": "action",
+  "targets": ["omnifocus"],
+  "author": "TommyX",
+  "identifier": "com.tommyx.cfs-check-share",
+  "version": "1.0",
+  "description": "Check CFS Shares",
+  "label": "Check CFS Shares",
+  "paletteLabel": "Check CFS Shares"
+  }*/
+
+(() => {
+    let getQueuesFolder = () => {
+        return folders.byName("Queues")
+    }
+
+    let action = new PlugIn.Action(function(selection, sender) {
+        let queuesFolder = getQueuesFolder()
+        let data = []
+        let totalWeight = 0
+        if (queuesFolder.projects.length === 0) {
+            new Alert("No queues", "No CFS queues found.").show()
+            return
+        }
+        for (let t of queuesFolder.projects) {
+            let match = t.note.match(/\bweight: ([.0-9]+)\b/)
+            let weight = (match && parseFloat(match[1])) || 1
+            if (weight <= 0) weight = 1
+            totalWeight += weight
+            data.push({
+                name: t.name,
+                weight: weight,
+            })
+        }
+        let text = []
+        for (let d of data) {
+            let share = Math.round((d.weight / totalWeight) * 100)
+            text.push(`${d.name}: weight = ${d.weight}, share = ${share}%`)
+        }
+        new Alert("CFS Shares", text.join("\n")).show()
+    });
+
+    action.validate = function(selection, sender) {
+        return true
+    };
+
+    return action;
+})();
