@@ -17,7 +17,7 @@
     let work = (task, duration) => {
         let runtime = task.estimatedMinutes || 1
         let match = task.note.match(/\bweight: ([.0-9]+)\b/)
-        let weight = (match && match[1]) || 1
+        let weight = (match && parseFloat(match[1])) || 1
         if (weight <= 0) weight = 1
         let delta = Math.ceil(duration / weight)
         task.estimatedMinutes = runtime + delta
