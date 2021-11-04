@@ -11,31 +11,127 @@
 
 (() => {
     let getQueuesFolder = () => {
-        return folders.byName("Queues")
+        return folders.byName("Queues Test")
+    }
+
+    let stringParser = value => value
+
+    let floatParser = (value) => {
+        let result = parseFloat(value)
+        if (isNaN(result)) {
+            return undefined
+        }
+        return result
+    }
+
+    let boolParser = (value) => {
+        return value.trim() === "true"
+    }
+
+    let parsers = {
+        weight: floatParser,
+        isContainerOnly: boolParser,
+        useCFS: boolParser,
+    }
+
+    let isTaskActionable = (taskStatus) => {
+        return taskStatus === Task.Status.Available ||
+                taskStatus === Task.Status.DueSoon ||
+                taskStatus === Task.Status.Next ||
+                taskStatus === Task.Status.Overdue
+    }
+
+    let isTaskCompletedOrDropped = (taskStatus) => {
+        return taskStatus === Task.Status.Completed ||
+                taskStatus === Task.Status.Dropped
+    }
+
+    let parseTaskParams = (task) => {
+        let params = {
+            weight: 1,
+            isContainerOnly: false,
+            useCFS: false,
+        }
+
+        let note = task.note
+        let lineBreakIndex = note.indexOf("\n")
+        if (lineBreakIndex >= 0) {
+            note = note.substring(0, lineBreakIndex)
+        }
+        for (let p of note.split(",")) {
+            let match = p.match(/\b(\w+)\s*:\s*(\S+)\b/)
+            if (match) {
+                let key = match[1]
+                let value = match[2]
+                if (parsers[key] === undefined) {
+                    continue
+                }
+                value = parsers[key](value)
+                if (value === undefined) {
+                    continue
+                }
+                params[key] = value
+            }
+        }
+        return params
+    }
+
+    let isUsingCFS = (task, queuesFolder, taskParams) => {
+        if (!task) return false
+
+        if (!queuesFolder) queuesFolder = getQueuesFolder()
+
+        if (task instanceof Folder) {
+            return queuesFolder == task
+        }
+        if (!taskParams) {
+            taskParams = parseTaskParams(task)
+        }
+        return taskParams.useCFS
+    }
+
+    let isIncompleteTask = (task) => {
+        return !isTaskCompletedOrDropped(task.taskStatus)
     }
 
     let action = new PlugIn.Action(function(selection, sender) {
         let queuesFolder = getQueuesFolder()
         let data = []
         let totalWeight = 0
+
         if (queuesFolder.projects.length === 0) {
             new Alert("No queues", "No CFS queues found.").show()
             return
         }
-        for (let t of queuesFolder.projects) {
-            let match = t.note.match(/\bweight: ([.0-9]+)\b/)
-            let weight = (match && parseFloat(match[1])) || 1
-            if (weight <= 0) weight = 1
-            totalWeight += weight
-            data.push({
-                name: t.name,
-                weight: weight,
-            })
+
+        let dfs = (prefix, totalShare, siblings) => {
+            let totalWeight = 0
+            for (let t of siblings) {
+                let tParams = parseTaskParams(t)
+                totalWeight += tParams.weight
+            }
+            for (let t of siblings) {
+                let tParams = parseTaskParams(t)
+                let name = prefix + "/" + t.name
+                let share = totalShare * tParams.weight / totalWeight
+                data.push({
+                    name: name,
+                    share: share,
+                })
+                console.log(t.name)
+                console.log(isUsingCFS(t, queuesFolder, tParams))
+                if (isUsingCFS(t, queuesFolder, tParams)) {
+                    dfs(name, share, t.children.filter(isIncompleteTask))
+                }
+            }
         }
+
+        dfs("", 1, queuesFolder.projects.filter(isIncompleteTask))
+        
         let text = []
         for (let d of data) {
-            let share = Math.round((d.weight / totalWeight) * 100)
-            text.push(`${share}%        ${d.name}    (weight = ${d.weight})`)
+            let share = Math.round(d.share * 1000) / 10
+            text.push(`${d.name}    ${share}%`)
         }
         new Alert("CFS Shares", text.join("\n")).show()
     });

@@ -1,0 +1,22 @@
+/*{
+  "type": "action",
+  "targets": ["omnifocus"],
+  "author": "TommyX",
+  "identifier": "com.tommyx.scratch",
+  "version": "1.0",
+  "description": "Scratch",
+  "label": "Scratch",
+  "paletteLabel": "Scratch"
+  }*/
+
+(() => {
+    let action = new PlugIn.Action(function(selection, sender) {
+        console.log(selection.taskStatus)
+    });
+
+    action.validate = function(selection, sender) {
+        return true;
+    };
+
+    return action;
+})();

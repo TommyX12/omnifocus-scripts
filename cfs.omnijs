@@ -10,63 +10,189 @@
   }*/
 
 (() => {
-    let getQueuesFolder = () => folders.byName("Queues")
+    let getQueuesFolder = () => folders.byName("Queues Test")
 
-    let isActive = t => t.nextTask && t.nextTask != t.task
+    let stringParser = value => value
 
-    let work = (task, duration) => {
-        let queuesFolder = getQueuesFolder()
-        for (let t of queuesFolder.projects) {
-            if (t.containsSingletonActions) {
-                new Alert("Invalid project", "Project with singleton actions is not supported").show()
-                return
-            }
+    let floatParser = (value) => {
+        let result = parseFloat(value)
+        if (isNaN(result)) {
+            return undefined
+        }
+        return result
+    }
+
+    let boolParser = (value) => {
+        return value.trim() === "true"
+    }
+
+    let parsers = {
+        weight: floatParser,
+        isContainerOnly: boolParser,
+        useCFS: boolParser,
+    }
+
+    let isTaskActionable = (taskStatus) => {
+        return taskStatus === Task.Status.Available ||
+                taskStatus === Task.Status.DueSoon ||
+                taskStatus === Task.Status.Next ||
+                taskStatus === Task.Status.Overdue
+    }
+
+    let isTaskCompletedOrDropped = (taskStatus) => {
+        return taskStatus === Task.Status.Completed ||
+                taskStatus === Task.Status.Dropped
+    }
+
+    let parseTaskParams = (task) => {
+        let params = {
+            weight: 1,
+            isContainerOnly: false,
+            useCFS: false,
         }
 
-        let runtime = task.estimatedMinutes || 1
-        let match = task.note.match(/\bweight: ([.0-9]+)\b/)
-        let weight = (match && parseFloat(match[1])) || 1
-        if (weight <= 0) weight = 1
-        let delta = Math.ceil(duration / weight)
-        task.estimatedMinutes = runtime + delta
+        let note = task.note
+        let lineBreakIndex = note.indexOf("\n")
+        if (lineBreakIndex >= 0) {
+            note = note.substring(0, lineBreakIndex)
+        }
+        for (let p of note.split(",")) {
+            let match = p.match(/\b(\w+)\s*:\s*(\S+)\b/)
+            if (match) {
+                let key = match[1]
+                let value = match[2]
+                if (parsers[key] === undefined) {
+                    continue
+                }
+                value = parsers[key](value)
+                if (value === undefined) {
+                    continue
+                }
+                params[key] = value
+            }
+        }
+        return params
+    }
 
-        // normalization
+    let isUsingCFS = (task, queuesFolder, taskParams) => {
+        if (!task) return false
 
-        // find min runtime of active tasks
-        let minRuntime = -1
-        for (let t of queuesFolder.projects) {
-            let runtime = t.estimatedMinutes || 1
-            if ((t == task || isActive(t))
-                && (minRuntime === -1 || runtime < minRuntime)) {
-                minRuntime = runtime
-            }
+        if (!queuesFolder) queuesFolder = getQueuesFolder()
+
+        if (task instanceof Folder) {
+            return queuesFolder == task
         }
-        // inactive tasks gets moved along with the current task, bounded by min runtime of active tasks
-        for (let t of queuesFolder.projects) {
-            let runtime = t.estimatedMinutes || 1
-            if (t != task && !isActive(t)) {
-                t.estimatedMinutes = Math.min(minRuntime, runtime + delta)
-            }
+        if (!taskParams) {
+            taskParams = parseTaskParams(task)
         }
-        // now find min runtime of all tasks
-        minRuntime = -1
-        for (let t of queuesFolder.projects) {
-            let runtime = t.estimatedMinutes || 1
-            if (minRuntime === -1 || runtime < minRuntime) {
-                minRuntime = runtime
-            }
+        return taskParams.useCFS
+    }
+
+    let getSelectedTasks = (selection) => {
+        let selected = []
+        for (let task of selection.projects) {
+            selected.push(task)
         }
-        // normalizes so that their minimum becomes 1
-        if (minRuntime !== -1) {
-            let delta = minRuntime - 1
-            for (let t of queuesFolder.projects) {
-                let runtime = t.estimatedMinutes || 1
-                t.estimatedMinutes = Math.max(1, runtime - delta)
-            }
+        for (let task of selection.tasks) {
+            selected.push(task)
         }
+        return selected
+    }
+
+    let getParent = (task) => {
+        if (task instanceof Project) {
+            return task.parentFolder
+        }
+        if (task instanceof Task) {
+            let result = task.parent
+            if (result && result.project) return result.project
+            return result
+        }
+        return undefined
     }
 
     let action = new PlugIn.Action(function(selection, sender) {
+        let queuesFolder = getQueuesFolder()
+
+        let isActive = (task, taskParams) => {
+            if (isTaskCompletedOrDropped(task)) {
+                console.log(`${task.name} is completed or dropped`)
+                return false
+            }
+
+            let hasAvailableChildren = false
+            if (task instanceof Project && !task.containsSingletonActions) {
+                hasAvailableChildren = task.nextTask && task.nextTask != task.task
+            } else {
+                hasAvailableChildren = task.children.some(child => {
+                    return isTaskActionable(child.taskStatus)
+                })
+            }
+
+            if (hasAvailableChildren) {
+                return true
+            }
+
+            let isSelfAvailable = false
+            if (!taskParams.isContainerOnly) {
+                isSelfAvailable = isTaskActionable(task.taskStatus)
+            }
+            return isSelfAvailable
+        }
+
+        let logWork = (task, duration, siblings) => {
+            let taskParams = parseTaskParams(task)
+            let siblingParams = siblings.map(parseTaskParams)
+
+            let runtime = task.estimatedMinutes || 1
+            let weight = taskParams.weight
+            let delta = Math.ceil(duration / weight)
+            task.estimatedMinutes = runtime + delta
+
+            // normalization
+
+            // find min runtime of active tasks
+            let minRuntime = -1
+            for (let i = 0; i < siblings.length; ++i) {
+                let t = siblings[i]
+                let tParams = siblingParams[i]
+                let runtime = t.estimatedMinutes || 1
+                if ((t == task || isActive(t, tParams))
+                    && (minRuntime === -1 || runtime < minRuntime)) {
+                    minRuntime = runtime
+                }
+            }
+            // inactive tasks gets moved along with the current task, bounded by min runtime of active tasks
+            for (let i = 0; i < siblings.length; ++i) {
+                let t = siblings[i]
+                let tParams = siblingParams[i]
+                let runtime = t.estimatedMinutes || 1
+                if (t != task && !isActive(t, tParams)) {
+                    t.estimatedMinutes = Math.max(runtime, Math.min(minRuntime, runtime + delta))
+                }
+            }
+            // now find min runtime of all tasks
+            minRuntime = -1
+            for (let i = 0; i < siblings.length; ++i) {
+                let t = siblings[i]
+                let tParams = siblingParams[i]
+                let runtime = t.estimatedMinutes || 1
+                if (minRuntime === -1 || runtime < minRuntime) {
+                    minRuntime = runtime
+                }
+            }
+            // normalizes so that their minimum becomes 1
+            if (minRuntime !== -1) {
+                let delta = minRuntime - 1
+                for (let i = 0; i < siblings.length; ++i) {
+                    let t = siblings[i]
+                    let tParams = siblingParams[i]
+                    let runtime = t.estimatedMinutes || 1
+                    t.estimatedMinutes = Math.max(1, runtime - delta)
+                }
+            }
+        }
+
         let inputForm = new Form()
         let dateFormat = Formatter.Date.Style.Short
         let dateFormatter = Formatter.Date.withStyle(dateFormat, dateFormat)
@@ -88,14 +214,31 @@
 
         formPromise.then(function(formObject){
             try {
-                let selected = undefined
-                for (let task of selection.projects) {
-                    selected = task
+                let task = getSelectedTasks(selection)[0]
+                let parent = getParent(task)
+                while (parent) {
+                    if (isUsingCFS(parent, queuesFolder)) {
+                        let isFolder = parent instanceof Folder
+                        logWork(
+                            task,
+                            Math.round(parseFloat(formObject.values["duration"]) * 60),
+                            isFolder ? parent.projects : parent.children)
+
+                        if (!isFolder) {
+                            // sort siblings
+                            let siblings = parent.children.filter(
+                                task => !isTaskCompletedOrDropped(task.taskStatus))
+                            siblings.sort((a, b) => {
+                                a = a.estimatedMinutes || 1
+                                b = b.estimatedMinutes || 1
+                                return a - b
+                            })
+                            moveTasks(siblings, parent)
+                        }
+                    }
+                    task = parent
+                    parent = getParent(parent)
                 }
-                for (let task of selection.tasks) {
-                    selected = task
-                }
-                work(selected, Math.round(parseFloat(formObject.values["duration"]) * 60))
             }
             catch(err){
                 console.error(err)
@@ -111,10 +254,20 @@
         let queuesFolder = getQueuesFolder()
         if (!queuesFolder) return false;
 
-        if (!selection.projects || selection.projects.length !== 1) return false;
+        let selected = getSelectedTasks(selection)
+        if (selected.length !== 1) return false;
 
-        let selected = selection.projects[0]
-        return selected.parentFolder == queuesFolder
+        let task = selected[0]
+
+        let parent = getParent(task)
+        while (parent) {
+            if (!isUsingCFS(parent, queuesFolder)) return false
+            if (parent == queuesFolder) return true
+            task = parent
+            parent = getParent(parent)
+        }
+
+        return false
     };
 
     return action;
