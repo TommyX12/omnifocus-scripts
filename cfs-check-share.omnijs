@@ -11,7 +11,7 @@
 
 (() => {
     let getQueuesFolder = () => {
-        return folders.byName("Queues Test")
+        return folders.byName("Queues")
     }
 
     let stringParser = value => value
@@ -137,7 +137,8 @@
     });
 
     action.validate = function(selection, sender) {
-        return true
+        let queuesFolder = getQueuesFolder()
+        if (!queuesFolder) return false
     };
 
     return action;

@@ -10,7 +10,7 @@
   }*/
 
 (() => {
-    let getQueuesFolder = () => folders.byName("Queues Test")
+    let getQueuesFolder = () => folders.byName("Queues")
 
     let stringParser = value => value
 
