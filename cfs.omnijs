@@ -10,9 +10,9 @@
   }*/
 
 (() => {
-    let getQueuesFolder = () => {
-        return folders.byName("Queues")
-    }
+    let getQueuesFolder = () => folders.byName("Queues")
+
+    let isActive = t => t.nextTask && t.nextTask != t.task
 
     let work = (task, duration) => {
         let queuesFolder = getQueuesFolder()
@@ -31,14 +31,32 @@
         task.estimatedMinutes = runtime + delta
 
         // normalization
+
+        // find min runtime of active tasks
         let minRuntime = -1
         for (let t of queuesFolder.projects) {
             let runtime = t.estimatedMinutes || 1
-            if ((t == task || (t.nextTask && t.nextTask != t.task))
+            if ((t == task || isActive(t))
                 && (minRuntime === -1 || runtime < minRuntime)) {
                 minRuntime = runtime
             }
         }
+        // inactive tasks gets moved along with the current task, bounded by min runtime of active tasks
+        for (let t of queuesFolder.projects) {
+            let runtime = t.estimatedMinutes || 1
+            if (t != task && !isActive(t)) {
+                t.estimatedMinutes = Math.min(minRuntime, runtime + delta)
+            }
+        }
+        // now find min runtime of all tasks
+        minRuntime = -1
+        for (let t of queuesFolder.projects) {
+            let runtime = t.estimatedMinutes || 1
+            if (minRuntime === -1 || runtime < minRuntime) {
+                minRuntime = runtime
+            }
+        }
+        // normalizes so that their minimum becomes 1
         if (minRuntime !== -1) {
             let delta = minRuntime - 1
             for (let t of queuesFolder.projects) {
