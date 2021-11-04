@@ -139,6 +139,7 @@
     action.validate = function(selection, sender) {
         let queuesFolder = getQueuesFolder()
         if (!queuesFolder) return false
+        return true
     };
 
     return action;
