@@ -11,7 +11,13 @@
 
 (() => {
     let action = new PlugIn.Action(function(selection, sender) {
-        console.log(selection.taskStatus)
+        console.log(selection.tasks[0].id.primaryKey)
+        let thingy = {
+            [selection.tasks[0].id.primaryKey]: 1,
+        }
+        for (let k in thingy) {
+            console.log(`${k}: ${thingy[k]}`)
+        }
     });
 
     action.validate = function(selection, sender) {

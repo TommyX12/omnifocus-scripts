@@ -1,0 +1,23 @@
+{
+  "defaultLocale": "en",
+  "author": "TommyX",
+  "identifier": "com.tommyx.tommyx",
+  "version": "0.0.1",
+  "description": "TommyX's scripts",
+  "actions": [
+    {
+      "identifier": "logCFSWork"
+    },
+    {
+      "identifier": "checkCFSShare"
+    },
+    {
+      "identifier": "updateScheduler"
+    }
+  ],
+  "libraries": [
+    {
+      "identifier": "common"
+    }
+  ]
+}
