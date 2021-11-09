@@ -23,12 +23,13 @@
 
         let dfs = (prefix, totalShare, siblings) => {
             let totalWeight = 0
-            for (let t of siblings) {
+            siblings = siblings.map(t => {
                 let tParams = parseTaskParams(t)
                 totalWeight += tParams.weight
-            }
-            for (let t of siblings) {
-                let tParams = parseTaskParams(t)
+                return {t, tParams}
+            })
+            siblings.sort((a, b) => b.tParams.weight - a.tParams.weight)
+            for (let {t, tParams} of siblings) {
                 let name = prefix + "/" + t.name
                 let share = totalShare * tParams.weight / totalWeight
                 data.push({

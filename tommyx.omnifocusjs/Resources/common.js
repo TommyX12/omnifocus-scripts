@@ -94,7 +94,8 @@
                 }
                 let cost = Math.max(1, t.estimatedMinutes || 1)
                 let id = t.id.primaryKey
-                bcrMap[id] = Math.pow(10, logValue + logLikelihood) / cost
+                let bcr = Math.pow(10, logValue + logLikelihood) / cost
+                bcrMap[id] = bcr
             }
             siblings.sort((a, b) => {
                 return bcrMap[b.id.primaryKey] - bcrMap[a.id.primaryKey]
@@ -213,6 +214,10 @@
             return result
         }
         return undefined
+    }
+
+    lib.strcmp = (a, b) => {
+        return a < b ? -1 : (a > b ? 1 : 0)
     }
 
     return lib;
