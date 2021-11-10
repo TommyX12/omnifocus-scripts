@@ -53,7 +53,7 @@
         for (let d of data) {
             text.push(`${d.name}    ${formatMinutes(Math.round(d.waitMinutes))}`)
         }
-        new Alert("CFS Shares", text.join("\n")).show()
+        new Alert("CFS Approximated Wait Time", text.join("\n")).show()
     });
 
     action.validate = function (selection, sender) {
