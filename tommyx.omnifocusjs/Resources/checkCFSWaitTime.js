@@ -28,11 +28,12 @@
                 return {t, tParams}
             })
             siblings.sort((a, b) => a.tParams.vruntime - b.tParams.vruntime)
+            let waitMinutes = accumulatedWaitMinutes
             let minutesPerVruntime = 0
             let lastVruntime = siblings[0].tParams.vruntime
             for (let {t, tParams} of siblings) {
                 let name = prefix + "/" + t.name
-                let waitMinutes = accumulatedWaitMinutes + (tParams.vruntime - lastVruntime) * minutesPerVruntime
+                waitMinutes += (tParams.vruntime - lastVruntime) * minutesPerVruntime
                 data.push({
                     name: name,
                     waitMinutes: waitMinutes,
