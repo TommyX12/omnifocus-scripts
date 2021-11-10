@@ -12,6 +12,9 @@
       "identifier": "checkCFSShare"
     },
     {
+      "identifier": "checkCFSWaitTime"
+    },
+    {
       "identifier": "updateScheduler"
     }
   ],
