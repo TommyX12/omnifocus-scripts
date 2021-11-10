@@ -50,7 +50,7 @@
         const totalHours = 40;
         let text = []
         for (let d of data) {
-            text.push(`${d.name}\n- ${formatMinutes(Math.round(d.waitMinutes))}  (${formatMinutes(Math.round(d.waitPerExtraMin))} per extra min)`)
+            text.push(`${d.name}\n- ${formatMinutes(Math.round(d.waitMinutes))}  (+${formatMinutes(Math.round(d.waitPerExtraMin))} per min)`)
         }
         new Alert("CFS Approximated Wait Time", text.join("\n")).show()
     });
