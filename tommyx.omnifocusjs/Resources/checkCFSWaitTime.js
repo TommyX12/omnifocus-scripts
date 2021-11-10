@@ -20,7 +20,7 @@
             return
         }
 
-        let dfs = (prefix, accumulatedWaitMinutes, siblings) => {
+        let dfs = (prefix, waitMinutes, minutesPerVruntime, siblings) => {
             if (siblings.length <= 0) return
 
             siblings = siblings.map(t => {
@@ -28,8 +28,6 @@
                 return {t, tParams}
             })
             siblings.sort((a, b) => a.tParams.vruntime - b.tParams.vruntime)
-            let waitMinutes = accumulatedWaitMinutes
-            let minutesPerVruntime = 0
             let lastVruntime = siblings[0].tParams.vruntime
             for (let {t, tParams} of siblings) {
                 let name = prefix + "/" + t.name
@@ -37,21 +35,22 @@
                 data.push({
                     name: name,
                     waitMinutes: waitMinutes,
+                    waitPerExtraMin: minutesPerVruntime / tParams.weight,
                 })
                 if (isUsingCFS(t, queuesFolder, tParams)) {
-                    dfs(name, waitMinutes, t.children.filter(isIncompleteTask))
+                    dfs(name, waitMinutes, minutesPerVruntime, t.children.filter(isIncompleteTask))
                 }
                 minutesPerVruntime += tParams.weight
                 lastVruntime = tParams.vruntime
             }
         }
 
-        dfs("", 0, queuesFolder.projects.filter(isIncompleteTask))
+        dfs("", 0, 0, queuesFolder.projects.filter(isIncompleteTask))
 
         const totalHours = 40;
         let text = []
         for (let d of data) {
-            text.push(`${d.name}    ${formatMinutes(Math.round(d.waitMinutes))}`)
+            text.push(`${d.name}\n- ${formatMinutes(Math.round(d.waitMinutes))}  (${formatMinutes(Math.round(d.waitPerExtraMin))} per extra min)`)
         }
         new Alert("CFS Approximated Wait Time", text.join("\n")).show()
     });
