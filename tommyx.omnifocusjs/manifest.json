@@ -6,6 +6,9 @@
   "description": "TommyX's scripts",
   "actions": [
     {
+      "identifier": "queueStatus"
+    },
+    {
       "identifier": "logCFSWork"
     },
     {

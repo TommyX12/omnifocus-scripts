@@ -38,6 +38,9 @@
             taskStatus === Task.Status.Dropped
     }
 
+    lib.isTaskRemaining = (taskStatus) =>
+        !lib.isTaskCompletedOrDropped(taskStatus)
+
     lib.defaultTaskParams = {
         vruntime: 0,
         weight: 1,
